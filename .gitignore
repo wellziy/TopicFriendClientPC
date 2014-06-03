@@ -1,0 +1,7 @@
+.settings/
+bin/
+topicfrienddb/
+*.log
+*.sql
+.classpath
+.project

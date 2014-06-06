@@ -1,13 +1,13 @@
 package topicfriend.client;
 
 import java.io.IOException;
-
-import org.apache.http.util.ByteArrayBuffer;
+import java.util.Scanner;
 
 import topicfriend.client.netwrapper.BadConnectionHandler;
 import topicfriend.client.netwrapper.NetMessageHandler;
 import topicfriend.client.netwrapper.NetMessageReceiver;
 import topicfriend.netmessage.NetMessage;
+import topicfriend.netmessage.NetMessageChatFriend;
 import topicfriend.netmessage.NetMessageID;
 import topicfriend.netmessage.NetMessageLogin;
 import topicfriend.network.Network;
@@ -17,9 +17,10 @@ public class TopicFriendClientPC
 	public static void main(String[] args)
 	{
 		Network.initNetwork(1, 1, 10);
+		int connection=Network.NULL_CONNECTION;
 		try
 		{
-			int connection=Network.connectHostPort("localhost", 55555, 2000);
+			connection=Network.connectHostPort("localhost", 55555, 2000);
 			
 			if(connection!=Network.NULL_CONNECTION)
 			{
@@ -32,40 +33,69 @@ public class TopicFriendClientPC
 					}
 				});
 				
-				NetMessageReceiver.getInstance().setMessageHandler(NetMessageID.LOGIN, new NetMessageHandler()
+				NetMessageReceiver.getInstance().setMessageHandler(NetMessageID.ERROR, new NetMessageHandler() {
+					@Override
+					public void handleMessage(int connection, NetMessage msg)
+					{
+						System.out.println("receive ERROR: "+msg.toJsonString());
+					}
+				});
+				
+				NetMessageReceiver.getInstance().setMessageHandler(NetMessageID.LOGIN_SUCCEED, new NetMessageHandler()
 				{
 					@Override
 					public void handleMessage(int connection, NetMessage msg)
 					{
-						System.out.println("received message: "+msg.toString());
+						System.out.println("receive LOGIN_SUCCEED: "+msg.toString());
 					}
 				});
 				
-				NetMessageLogin login=new NetMessageLogin("hello", "world");
-				Network.sendDataOne(login.toByteArrayBuffer(), connection);
+				NetMessageReceiver.getInstance().setMessageHandler(NetMessageID.CHAT_FRIEND, new NetMessageHandler()
+				{
+					@Override
+					public void handleMessage(int connection, NetMessage msg)
+					{
+						System.out.println("receive CHAT_FRIEND: "+msg.toJsonString());
+					}
+				});
 				
-				ByteArrayBuffer badBuffer=new ByteArrayBuffer(10);
-				byte[] byteArr=new String("good").getBytes();
-				badBuffer.append(byteArr, 0, byteArr.length);
-				Network.sendDataOne(badBuffer, connection);
+//				NetMessageLogin login=new NetMessageLogin("hello", "world");
+//				Network.sendDataOne(login.toByteArrayBuffer(), connection);
+//				
+//				NetMessageRegister msgRegister=new NetMessageRegister("hhhhhhhhhhhhh", "hhhhhhhhhhhhh", UserInfo.SEX_MALE);
+//				Network.sendDataOne(msgRegister.toByteArrayBuffer(), connection);
 			}
-
 		} 
 		catch (IOException e) 
 		{
 			e.printStackTrace();
-			System.out.println("failed to connection host");
+			System.out.println("failed to connect host");
 		}
 		
-		try
+		Scanner sc=new Scanner(System.in);
+		while(connection!=Network.NULL_CONNECTION&&!Thread.interrupted())
 		{
-			Thread.sleep(10000);
-		} 
-		catch (InterruptedException e) 
-		{
-			e.printStackTrace();
+			int msgCode=sc.nextInt();
+			if(msgCode==NetMessageID.CHAT_FRIEND)
+			{
+				System.out.println("fid,content");
+				int fid=sc.nextInt();
+				String content=sc.nextLine();
+				NetMessageChatFriend msgChatFriend=new NetMessageChatFriend(fid, content);
+				Network.sendDataOne(msgChatFriend.toByteArrayBuffer(), connection);
+			}
+			
+			if(msgCode==NetMessageID.LOGIN)
+			{
+				System.out.println("name,password");
+				String name=sc.nextLine();
+				String password=sc.nextLine();
+				NetMessageLogin msgLogin=new NetMessageLogin(name,password);
+				Network.sendDataOne(msgLogin.toByteArrayBuffer(), connection);
+			}
 		}
 		
+		System.out.println("after the thread was interrupted");
 		NetMessageReceiver.getInstance().purgeInstance();
 		Network.destroyNetwork();
 	}
